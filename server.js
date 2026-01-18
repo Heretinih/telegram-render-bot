@@ -3,81 +3,129 @@ import express from "express";
 const app = express();
 
 /* ===============================
-   REQUIRED MIDDLEWARE
+   MIDDLEWARE
 ================================ */
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* ===============================
-   ROOT CHECK (BROWSER / RENDER)
+   ROOT CHECK
 ================================ */
 app.get("/", (req, res) => {
-  res.status(200).send("OK - Preview Mode");
+  res.status(200).send("OK - Structured Mode");
 });
 
 /* ===============================
-   TELEGRAM WEBHOOK (PREVIEW ONLY)
+   HELPERS
+================================ */
+function parseCaption(captionRaw) {
+  if (!captionRaw || typeof captionRaw !== "string") {
+    return {
+      raw: null,
+      outlet_id: "REQUIRED",
+      outlet_name: "REQUIRED",
+      valid: false
+    };
+  }
+
+  const parts = captionRaw.split("-").map(p => p.trim());
+  if (parts.length !== 2) {
+    return {
+      raw: captionRaw,
+      outlet_id: "REQUIRED",
+      outlet_name: "REQUIRED",
+      valid: false
+    };
+  }
+
+  const [a, b] = parts;
+  const isNumA = /^\d+$/.test(a);
+  const isNumB = /^\d+$/.test(b);
+
+  if (isNumA && !isNumB) {
+    return { raw: captionRaw, outlet_id: a, outlet_name: b, valid: true };
+  }
+
+  if (!isNumA && isNumB) {
+    return { raw: captionRaw, outlet_id: b, outlet_name: a, valid: true };
+  }
+
+  return {
+    raw: captionRaw,
+    outlet_id: "REQUIRED",
+    outlet_name: "REQUIRED",
+    valid: false
+  };
+}
+
+function parseLocation(msg) {
+  if (msg.location?.latitude && msg.location?.longitude) {
+    return {
+      lat: msg.location.latitude,
+      lng: msg.location.longitude,
+      valid: true
+    };
+  }
+
+  return {
+    lat: "REQUIRED",
+    lng: "REQUIRED",
+    valid: false
+  };
+}
+
+/* ===============================
+   TELEGRAM WEBHOOK
 ================================ */
 app.post("/webhook", (req, res) => {
   const msg = req.body?.message;
+  if (!msg) return res.sendStatus(200);
 
-  if (!msg) {
-    console.log("⚠️ No message object in update");
-    return res.sendStatus(200);
-  }
+  const photos = Array.isArray(msg.photo) ? msg.photo : [];
 
-  // ---- USER ----
-  const username =
-    msg.from?.username ??
-    msg.from?.first_name ??
-    "UNKNOWN_USER";
+  const record = {
+    group_id: String(msg.chat?.id ?? ""),
+    group_name: msg.chat?.title ?? "",
 
-  // ---- GROUP ----
-  const groupName = msg.chat?.title ?? "PRIVATE_CHAT";
-  const groupId = msg.chat?.id ?? "N/A";
+    user: {
+      username:
+        msg.from?.username ??
+        msg.from?.first_name ??
+        "UNKNOWN"
+    },
 
-  // ---- TIME ----
-  const timestamp = msg.date
-    ? new Date(msg.date * 1000).toISOString()
-    : "NO_DATE";
+    caption: parseCaption(msg.caption),
 
-  // ---- PHOTO (BEST QUALITY) ----
-  let bestPhoto = null;
-  if (Array.isArray(msg.photo) && msg.photo.length > 0) {
-    bestPhoto = msg.photo[msg.photo.length - 1];
-  }
+    location: parseLocation(msg),
 
-  // ---- PREVIEW OUTPUT ----
-  console.log("========== TELEGRAM DATA PREVIEW ==========");
-  console.log("User      :", username);
-  console.log("Group     :", groupName);
-  console.log("Group ID  :", groupId);
-  console.log("Time (ISO):", timestamp);
+    photos: {
+      count: photos.length,
+      photo_ids: photos.map(p => p.file_id)
+    },
 
-  if (bestPhoto) {
-    console.log("Photo width :", bestPhoto.width);
-    console.log("Photo ID    :", bestPhoto.file_id);
-    console.log("Photo size  :", bestPhoto.file_size);
-  } else {
-    console.log("No photo in this message");
-  }
+    time: {
+      iso: msg.date
+        ? new Date(msg.date * 1000).toISOString()
+        : null
+    }
+  };
 
-  console.log("==========================================");
+  console.log("===== FINAL NORMALIZED RECORD =====");
+  console.log(JSON.stringify(record, null, 2));
+  console.log("==================================");
 
-  // Always respond OK to Telegram
   res.sendStatus(200);
 });
 
 /* ===============================
-   CATCH ALL (HEALTH CHECKS)
+   FALLBACK
 ================================ */
 app.all("*", (req, res) => {
-  console.log("ℹ️ Other request:", req.method, req.url);
   res.sendStatus(200);
 });
 
 /* ===============================
-   RENDER PORT
+   PORT
 ================================ */
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
