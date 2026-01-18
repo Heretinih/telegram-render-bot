@@ -3,6 +3,15 @@ import express from "express";
 const app = express();
 
 /* ===============================
+   CONFIG
+================================ */
+const SALESMAN_MAP = {
+  // TEST MAPPING — edit later
+  "jobs_recruiter": "S001",
+  "sreyvin_sales": "S002"
+};
+
+/* ===============================
    MIDDLEWARE
 ================================ */
 app.use(express.json({ limit: "50mb" }));
@@ -12,12 +21,24 @@ app.use(express.urlencoded({ extended: true }));
    ROOT CHECK
 ================================ */
 app.get("/", (req, res) => {
-  res.status(200).send("OK - Structured Mode");
+  res.send("OK - Test Mode (Submission + Edit Logging)");
 });
 
 /* ===============================
    HELPERS
 ================================ */
+function resolveSalesman(username) {
+  if (!username) {
+    return { id: "REQUIRED", source: "missing" };
+  }
+
+  if (SALESMAN_MAP[username]) {
+    return { id: SALESMAN_MAP[username], source: "telegram_mapping" };
+  }
+
+  return { id: "REQUIRED", source: "missing" };
+}
+
 function parseCaption(captionRaw) {
   if (!captionRaw || typeof captionRaw !== "string") {
     return {
@@ -58,61 +79,81 @@ function parseCaption(captionRaw) {
   };
 }
 
-function parseLocation(msg) {
-  if (msg.location?.latitude && msg.location?.longitude) {
-    return {
-      lat: msg.location.latitude,
-      lng: msg.location.longitude,
-      valid: true
-    };
-  }
-
-  return {
-    lat: "REQUIRED",
-    lng: "REQUIRED",
-    valid: false
-  };
-}
-
 /* ===============================
-   TELEGRAM WEBHOOK
+   MAIN WEBHOOK
 ================================ */
 app.post("/webhook", (req, res) => {
-  const msg = req.body?.message;
-  if (!msg) return res.sendStatus(200);
 
-  const photos = Array.isArray(msg.photo) ? msg.photo : [];
+  /* ---------- NEW MESSAGE ---------- */
+  if (req.body.message) {
+    const msg = req.body.message;
 
-  const record = {
-    group_id: String(msg.chat?.id ?? ""),
-    group_name: msg.chat?.title ?? "",
+    const username =
+      msg.from?.username ??
+      msg.from?.first_name ??
+      "UNKNOWN";
 
-    user: {
-      username:
-        msg.from?.username ??
-        msg.from?.first_name ??
-        "UNKNOWN"
-    },
+    const salesman = resolveSalesman(username);
+    const caption = parseCaption(msg.caption);
 
-    caption: parseCaption(msg.caption),
+    const record = {
+      Record_Type: "SUBMISSION",
 
-    location: parseLocation(msg),
+      Message_ID: msg.message_id,
+      Telegram_Time_ISO: new Date(msg.date * 1000).toISOString(),
 
-    photos: {
-      count: photos.length,
-      photo_ids: photos.map(p => p.file_id)
-    },
+      Group_ID: msg.chat?.id,
+      Group_Name: msg.chat?.title,
 
-    time: {
-      iso: msg.date
-        ? new Date(msg.date * 1000).toISOString()
-        : null
-    }
-  };
+      Salesman_ID: salesman.id,
+      Salesman_Username: username,
+      Salesman_Source: salesman.source,
 
-  console.log("===== FINAL NORMALIZED RECORD =====");
-  console.log(JSON.stringify(record, null, 2));
-  console.log("==================================");
+      Outlet_ID: caption.outlet_id,
+      Outlet_Name: caption.outlet_name,
+      Caption_Raw: caption.raw,
+      Caption_Valid: caption.valid ? "YES" : "NO",
+
+      Edited: "NO",
+      Status:
+        caption.valid && salesman.id !== "REQUIRED"
+          ? "OK"
+          : "REQUIRED_FIELDS_MISSING"
+    };
+
+    console.log("===== NEW SUBMISSION =====");
+    console.log(JSON.stringify(record, null, 2));
+    console.log("==========================");
+
+    return res.sendStatus(200);
+  }
+
+  /* ---------- EDITED MESSAGE ---------- */
+  if (req.body.edited_message) {
+    const msg = req.body.edited_message;
+
+    const editedBy =
+      msg.from?.username ??
+      msg.from?.first_name ??
+      "UNKNOWN";
+
+    const editLog = {
+      Record_Type: "EDIT_LOG",
+
+      Message_ID: msg.message_id,
+      Edited_By: editedBy,
+      Edited_At_ISO: new Date(msg.edit_date * 1000).toISOString(),
+
+      Edited_Caption_Raw: msg.caption ?? null,
+      Edit_Action: "LOGGED_ONLY"
+    };
+
+    console.log("===== EDIT DETECTED =====");
+    console.log(JSON.stringify(editLog, null, 2));
+    console.log("========================");
+
+    return res.sendStatus(200);
+  }
 
   res.sendStatus(200);
 });
@@ -120,9 +161,7 @@ app.post("/webhook", (req, res) => {
 /* ===============================
    FALLBACK
 ================================ */
-app.all("*", (req, res) => {
-  res.sendStatus(200);
-});
+app.all("*", (req, res) => res.sendStatus(200));
 
 /* ===============================
    PORT
