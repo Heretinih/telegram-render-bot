@@ -2,49 +2,46 @@ import express from "express";
 
 const app = express();
 
-/* ======================================================
-   REQUIRED BODY PARSERS (THIS FIXES YOUR ISSUE)
-====================================================== */
+/* ===================================================
+   REQUIRED BODY PARSERS (WITHOUT THIS, POST FAILS)
+=================================================== */
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ======================================================
-   ROOT ENDPOINT (RENDER / BROWSER CHECK)
-====================================================== */
+/* ===================================================
+   ROOT ENDPOINT (BROWSER / RENDER CHECK)
+=================================================== */
 app.get("/", (req, res) => {
-  res.status(200).send("OK - Telegram Webhook Server Running");
+  res.status(200).send("OK - Telegram Render Bot Running");
 });
 
-/* ======================================================
-   TELEGRAM WEBHOOK ENDPOINT (POST ONLY)
-====================================================== */
+/* ===================================================
+   TELEGRAM WEBHOOK ENDPOINT
+=================================================== */
 app.post("/webhook", (req, res) => {
-  console.log("=================================");
-  console.log("📩 TELEGRAM WEBHOOK RECEIVED");
+  console.log("====================================");
+  console.log("✅ TELEGRAM POST RECEIVED");
   console.log("Time:", new Date().toISOString());
-  console.log("Body:");
+  console.log("Payload:");
   console.log(JSON.stringify(req.body, null, 2));
-  console.log("=================================");
+  console.log("====================================");
 
-  // Always reply 200 to Telegram
+  // Always respond quickly
   res.sendStatus(200);
 });
 
-/* ======================================================
-   CATCH ALL (LOG UNEXPECTED REQUESTS)
-====================================================== */
+/* ===================================================
+   CATCH-ALL (RENDER / CLOUDFLARE HEALTH CHECKS)
+=================================================== */
 app.all("*", (req, res) => {
-  console.log("⚠️ UNKNOWN REQUEST");
-  console.log("Method:", req.method);
-  console.log("URL:", req.url);
+  console.log("ℹ️ Non-webhook request:", req.method, req.url);
   res.sendStatus(200);
 });
 
-/* ======================================================
-   RENDER PORT BINDING (MANDATORY)
-====================================================== */
+/* ===================================================
+   RENDER PORT (MANDATORY)
+=================================================== */
 const PORT = process.env.PORT || 10000;
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
