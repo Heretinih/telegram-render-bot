@@ -1,21 +1,20 @@
-// parser.js
-import { normalizeRecord } from "./normalize.js";
-
-export function parseTelegramUpdate(update) {
-  const message =
-    update.message ||
-    update.edited_message ||
-    null;
-
-  if (!message) return null;
-
-  if (!message.photo) return null;
-
-  const record = normalizeRecord(message);
-
-  if (update.edited_message) {
-    record.edited = true;
-  }
-
-  return record;
+{
+  "edited": false,
+  "received_at": "2026-01-18T16:56:59.750Z",
+  "telegram_date": "2026-01-18T16:56:59.000Z",
+  "longitude": "REQUIRED",
+  "latitude": "REQUIRED",
+  "photo_height": 1280,
+  "photo_width": 1024,
+  "photo_file_id": "...",
+  "photo_count": 4,
+  "caption_normalized": "1234567 | FAFA",
+  "outlet_name": "FAFA",
+  "outlet_id": "1234567",
+  "caption_raw": "1234567 - FAFA",
+  "salesman_id": "REQUIRED",
+  "salesman_username": "jobs_recruiter",
+  "group_name": "All_visibility_bot",
+  "group_id": -1003695576235,
+  "message_id": 30
 }
