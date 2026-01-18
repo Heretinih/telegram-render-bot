@@ -1,37 +1,34 @@
+// server.js
 import express from "express";
 import bodyParser from "body-parser";
 import { parseTelegramUpdate } from "./parser.js";
 
 const app = express();
-const PORT = process.env.PORT || 10000;
-
 app.use(bodyParser.json());
 
-// Health check
 app.get("/", (req, res) => {
-  res.status(200).send("Telegram Visibility Bot is running");
+  res.send("Telegram Visibility Bot is running");
 });
 
-// ✅ TELEGRAM WEBHOOK — MUST MATCH /webhook
 app.post("/webhook", async (req, res) => {
   try {
-    console.log("=== TELEGRAM WEBHOOK RECEIVED ===");
-    console.log(JSON.stringify(req.body, null, 2));
+    const update = req.body;
+    const record = parseTelegramUpdate(update);
 
-    // Process update (photo, edit, etc.)
-    await parseTelegramUpdate(req.body);
+    if (record) {
+      console.log("========== STRUCTURED RECORD ==========");
+      console.log(JSON.stringify(record, null, 2));
+      console.log("=======================================");
+    }
 
-    // Telegram requires fast 200 OK
     res.sendStatus(200);
   } catch (err) {
-    console.error("Webhook processing error:", err);
-    res.sendStatus(200); // Still return 200 to avoid Telegram retry loop
+    console.error("Webhook error:", err);
+    res.sendStatus(500);
   }
 });
 
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log("===========================================");
   console.log(`Server running on port ${PORT}`);
-  console.log(`Webhook endpoint: /webhook`);
-  console.log("===========================================");
 });
