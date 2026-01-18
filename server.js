@@ -1,29 +1,50 @@
-const express = require("express");
+import express from "express";
+
 const app = express();
 
-app.use(express.json());
+/* ======================================================
+   REQUIRED BODY PARSERS (THIS FIXES YOUR ISSUE)
+====================================================== */
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true }));
 
-// LOG EVERY REQUEST (CRITICAL DEBUG)
-app.use((req, res, next) => {
-  console.log("=== INCOMING REQUEST ===");
-  console.log("Method:", req.method);
-  console.log("Headers:", req.headers);
-  console.log("Body:", JSON.stringify(req.body, null, 2));
-  console.log("========================");
-  next();
-});
-
+/* ======================================================
+   ROOT ENDPOINT (RENDER / BROWSER CHECK)
+====================================================== */
 app.get("/", (req, res) => {
-  res.send("Render service is running");
+  res.status(200).send("OK - Telegram Webhook Server Running");
 });
 
+/* ======================================================
+   TELEGRAM WEBHOOK ENDPOINT (POST ONLY)
+====================================================== */
 app.post("/webhook", (req, res) => {
-  console.log("=== TELEGRAM WEBHOOK RECEIVED ===");
+  console.log("=================================");
+  console.log("📩 TELEGRAM WEBHOOK RECEIVED");
+  console.log("Time:", new Date().toISOString());
+  console.log("Body:");
   console.log(JSON.stringify(req.body, null, 2));
-  res.status(200).send("OK");
+  console.log("=================================");
+
+  // Always reply 200 to Telegram
+  res.sendStatus(200);
 });
 
-const PORT = process.env.PORT || 3000;
+/* ======================================================
+   CATCH ALL (LOG UNEXPECTED REQUESTS)
+====================================================== */
+app.all("*", (req, res) => {
+  console.log("⚠️ UNKNOWN REQUEST");
+  console.log("Method:", req.method);
+  console.log("URL:", req.url);
+  res.sendStatus(200);
+});
+
+/* ======================================================
+   RENDER PORT BINDING (MANDATORY)
+====================================================== */
+const PORT = process.env.PORT || 10000;
+
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
