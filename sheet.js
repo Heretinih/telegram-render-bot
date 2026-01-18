@@ -1,15 +1,26 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-
 const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
 
-const doc = new GoogleSpreadsheet(SHEET_ID);
+// Create JWT auth client (v4+ REQUIRED)
+const auth = new JWT({
+  email: creds.client_email,
+  key: creds.private_key,
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+const doc = new GoogleSpreadsheet(SHEET_ID, auth);
 
 async function getSheet() {
-  await doc.useServiceAccountAuth(creds);
   await doc.loadInfo();
-  return doc.sheetsByTitle['Submissions'];
+
+  const sheet = doc.sheetsByTitle['Submissions'];
+  if (!sheet) {
+    throw new Error('Sheet "Submissions" not found');
+  }
+  return sheet;
 }
 
 /**
