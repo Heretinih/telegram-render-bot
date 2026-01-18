@@ -1,9 +1,56 @@
 /**
- * Normalize parsed Telegram data into a flat,
- * Google-Sheet-ready record.
+ * Normalize caption text into outlet_id + outlet_name
+ * Accepts:
+ *   - 1234567 - Sreyvin
+ *   - Sreyvin - 1234567
+ */
+function normalizeCaption(raw = '') {
+  const text = raw.trim();
+
+  if (!text) {
+    return {
+      outlet_id: 'Required',
+      outlet_name: 'Required',
+      caption: 'Required',
+    };
+  }
+
+  const parts = text.split('-').map(p => p.trim());
+
+  if (parts.length !== 2) {
+    return {
+      outlet_id: 'Required',
+      outlet_name: 'Required',
+      caption: text,
+    };
+  }
+
+  const [a, b] = parts;
+
+  const isANumber = /^\d+$/.test(a);
+  const isBNumber = /^\d+$/.test(b);
+
+  if (isANumber && !isBNumber) {
+    return { outlet_id: a, outlet_name: b, caption: text };
+  }
+
+  if (!isANumber && isBNumber) {
+    return { outlet_id: b, outlet_name: a, caption: text };
+  }
+
+  return {
+    outlet_id: 'Required',
+    outlet_name: 'Required',
+    caption: text,
+  };
+}
+
+/**
+ * MAIN EXPORT — used by server.js
  */
 export function normalizeRecord(parsed) {
   const now = new Date().toISOString();
+  const captionNorm = normalizeCaption(parsed.caption_raw || '');
 
   return {
     message_id: String(parsed.message_id),
@@ -13,13 +60,13 @@ export function normalizeRecord(parsed) {
     user_id: parsed.user_id || '',
 
     // Outlet
-    outlet_id: parsed.outlet_id || 'Required',
-    outlet_name: parsed.outlet_name || 'Required',
+    outlet_id: captionNorm.outlet_id,
+    outlet_name: captionNorm.outlet_name,
 
     // Salesman
     salesman_id: parsed.salesman_id || parsed.user_id || '',
 
-    // Media
+    // Photos
     photo_count: parsed.photo_count || 0,
     photo_file_ids: parsed.photo_file_ids?.join(',') || '',
     photo_width: parsed.photo_width || '',
@@ -28,13 +75,13 @@ export function normalizeRecord(parsed) {
 
     // Caption
     caption_raw: parsed.caption_raw || '',
-    caption: parsed.caption || 'Required',
+    caption: captionNorm.caption,
 
     // Location
     latitude: parsed.latitude ?? 'Required',
     longitude: parsed.longitude ?? 'Required',
 
-    // Forward / origin
+    // Forwarding
     is_forwarded: parsed.is_forwarded ? 'YES' : 'NO',
     original_sender: parsed.original_sender || '',
 
