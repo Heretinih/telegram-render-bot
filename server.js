@@ -1,31 +1,34 @@
 import express from "express";
-import { parseUpdate } from "./parser.js";
+import bodyParser from "body-parser";
 import { appendSubmission, updateSubmission } from "./sheet.js";
 
 const app = express();
-app.use(express.json());
+app.use(bodyParser.json());
 
-app.post("/webhook", async (req, res) => {
+app.post("/", async (req, res) => {
   try {
-    const record = parseUpdate(req.body);
-    if (!record) return res.sendStatus(200);
+    const payload = req.body;
 
-    if (record.edited) {
-      await updateSubmission(record);
-    } else {
-      await appendSubmission(record);
+    // Telegram edit
+    if (payload.edited_message) {
+      console.log(">>> UPDATE EXISTING ROW");
+      await updateSubmission(payload.edited_message);
     }
 
-    res.sendStatus(200);
+    // Telegram new message
+    if (payload.message) {
+      console.log(">>> APPEND NEW ROW");
+      await appendSubmission(payload.message);
+    }
+
+    res.send("OK");
   } catch (err) {
     console.error("Webhook error:", err);
-    res.sendStatus(500);
+    res.status(500).send("ERROR");
   }
 });
 
-app.get("/", (_, res) => res.send("Telegram bot is live"));
-
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () =>
-  console.log(`Server running on port ${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
