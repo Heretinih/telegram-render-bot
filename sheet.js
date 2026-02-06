@@ -1,3 +1,25 @@
+import { GoogleSpreadsheet } from "google-spreadsheet";
+
+const SHEET_NAME = "Submissions";
+
+async function getSheet() {
+  const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID);
+
+  await doc.useServiceAccountAuth({
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n"),
+  });
+
+  await doc.loadInfo();
+
+  const sheet = doc.sheetsByTitle[SHEET_NAME];
+  if (!sheet) {
+    throw new Error("Submissions sheet not found");
+  }
+
+  return sheet;
+}
+
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 
