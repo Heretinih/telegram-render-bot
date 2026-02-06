@@ -1,68 +1,40 @@
-import { GoogleSpreadsheet } from "google-spreadsheet";
+import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
 
-const SHEET_NAME = "Submissions";
+const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+
+function getAuth() {
+  return new JWT({
+    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+}
 
 async function getDoc() {
-  const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID);
-
-  await doc.useServiceAccountAuth({
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n")
-  });
-
+  const auth = getAuth();
+  const doc = new GoogleSpreadsheet(SHEET_ID, auth);
   await doc.loadInfo();
   return doc;
 }
 
-export async function appendSubmission(r) {
+export async function appendSubmission(record) {
   const doc = await getDoc();
-  const sheet = doc.sheetsByTitle[SHEET_NAME];
+  const sheet = doc.sheetsByTitle['Submissions'];
+  if (!sheet) throw new Error('Submissions sheet not found');
 
-  await sheet.addRow({
-  received_at: r.received_at,
-  telegram_date: r.telegram_date,
-  edited: false,
-  edited_at: "",
-  edited_by: "",
-  group_id: r.group_id,
-  group_name: r.group_name,
-  message_id: r.message_id,
-  telegram_username: r.telegram_username,
-
-  salesman_id: r.salesman_id,        // ✅ REQUIRED
-  outlet_id: r.outlet_id,
-  outlet_name: r.outlet_name,
-
-  caption_raw: r.caption_raw,
-  caption_normalized: r.caption_normalized,
-
-  photo_file_id: r.photo_file_id,
-  photo_width: r.photo_width,
-  photo_height: r.photo_height,
-  photo_count: r.photo_count,
-
-  latitude: r.latitude,              // ✅ REQUIRED
-  longitude: r.longitude             // ✅ REQUIRED
-});
+  await sheet.addRow(record);
 }
 
-export async function updateSubmission(r) {
+export async function updateSubmissionByMessageId(messageId, updates) {
   const doc = await getDoc();
-  const sheet = doc.sheetsByTitle[SHEET_NAME];
+  const sheet = doc.sheetsByTitle['Submissions'];
+  if (!sheet) throw new Error('Submissions sheet not found');
+
   const rows = await sheet.getRows();
-
-  const row = rows.find(x =>
-    String(x.message_id) === String(r.message_id) &&
-    String(x.group_id) === String(r.group_id)
-  );
-
+  const row = rows.find(r => String(r.message_id) === String(messageId));
   if (!row) return;
 
-  row.edited = true;
-  row.edited_at = r.edited_at;
-  row.edited_by = r.edited_by;
-  row.caption_raw = r.caption_raw;
-  row.caption_normalized = r.caption_normalized;
-
+  Object.assign(row, updates);
   await row.save();
 }
